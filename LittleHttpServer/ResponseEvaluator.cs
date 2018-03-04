@@ -5,13 +5,13 @@
         public Response Evaluate(object i)
         {
             if (i == null)
-                return new FileResponse(string.Empty);
+                return new TextResponse(string.Empty);
 
             if (i is Response r)
                 return r;
 
             if (i is string s)
-                return new FileResponse(s);
+                return new TextResponse(s);
 
             return new JsonResponse(i);
         }

@@ -15,24 +15,4 @@
             Body = body;
         }
     }
-
-    public class FileResponse : Response
-    {
-        public override string ContentType => "text/plain; charset=utf-8";
-
-        public FileResponse(string filename)
-        {
-            Body = body;
-        }
-
-        public FileResponse(int statusCode, string body)
-        {
-            StatusCode = statusCode;
-            Body = body;
-        }
-
-        public Task Process()
-        {
-        }
-    }
 }

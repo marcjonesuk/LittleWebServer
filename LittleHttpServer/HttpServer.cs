@@ -49,31 +49,37 @@ namespace LittleHttpServer
             });
         }
 
+
+        //private void AddAsync<TOut>(string method, string path, Func<Task> handler)
+        //{
+        //    router.AddRoute(method, path, async (body) =>
+        //    {
+        //        var result = await handler();
+        //        var response = responseEvaluator.Evaluate(result);
+        //        return response;
+        //    });
+        //}
+
         private void AddAsync<T, TOut>(string method, string path, Func<Request<T>, Task<TOut>> handler)
         {
             router.AddRoute(method, path, async (req) =>
             {
                 var payload = JsonConvert.DeserializeObject<T>(req.Body);
-                var request = new Request<T>(payload, req.Params, req.QueryString);
+                var request = new Request<T>(payload, req.Params, req.QueryString, req.Headers);
                 var result = await handler(request);
                 var response = responseEvaluator.Evaluate(result);
                 return response;
             });
         }
 
-        public void Get(string path, Func<Request<dynamic>, dynamic> handler)
+        public void Get(string path, Func<Request<dynamic>, object> handler)
         {
             Add("GET", path, handler);
         }
 
-        public void Get<T>(string path, Func<Request<T>, dynamic> handler)
+        public void Get<T>(string path, Func<Request<T>, object> handler)
         {
             Add("GET", path, handler);
-        }
-
-        public void Get<T>(string path, Action<Request<T>> handler)
-        {
-            Add<T, object>("GET", path, (req) => { handler(req); return null; });
         }
 
         public void Get(string path, Func<dynamic> handler)
@@ -81,7 +87,17 @@ namespace LittleHttpServer
             Add("GET", path, handler);
         }
 
-        public void Get<TOut>(string path, Func<Task<TOut>> handler)
+        public void Get(string path, Func<Task<object>> handler)
+        {
+            AddAsync("GET", path, handler);
+        }
+
+        public void Get<T>(string path, Func<Request<T>, Task<object>> handler)
+        {
+            AddAsync("GET", path, handler);
+        }
+
+        public void Get(string path, Func<Request<object>, Task<object>> handler)
         {
             AddAsync("GET", path, handler);
         }
@@ -101,6 +117,11 @@ namespace LittleHttpServer
             Listener.Close();
         }
 
+        public void Stop()
+        {
+
+        }
+
         private async void ProcessRequest(HttpListenerContext context)
         {
             HttpListenerRequest request = context.Request;
@@ -109,20 +130,32 @@ namespace LittleHttpServer
             {
                 //strip query string
                 var path = request.RawUrl.Split('?')[0];
-                var r = await router.Invoke(request.HttpMethod, path, () => new StreamReader(context.Request.InputStream).ReadToEnd(), request.QueryString);
+                var r = await router.Invoke(request.HttpMethod, 
+                    path, 
+                    () => new StreamReader(context.Request.InputStream).ReadToEnd(), 
+                    request.QueryString,
+                    request.Headers);
 
                 if (r != null)
                 {
-                    byte[] buffer = Encoding.UTF8.GetBytes(r.Body);
-                    response.ContentLength64 = buffer.Length;
-                    Stream output = response.OutputStream;
-                    output.Write(buffer, 0, buffer.Length);
-                    output.Close();
-                }
+                    response.StatusCode = r.StatusCode;
+                    response.ContentType = r.ContentType;
+                    response.Headers = r.Headers;
 
-                if (r == null)
+                    if (r.Body != null)
+                    {
+                        byte[] buffer = Encoding.UTF8.GetBytes(r.Body);
+                        response.ContentLength64 = buffer.Length;
+                        Stream output = response.OutputStream;
+                        output.Write(buffer, 0, buffer.Length);
+                    }
+                    response.OutputStream.Close();
+                }
+                else
+                {
                     response.StatusCode = 404;
-        }
+                }
+            }
             catch (Exception e)
             {
                 Console.WriteLine(e);

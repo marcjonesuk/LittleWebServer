@@ -13,6 +13,9 @@ namespace LittleHttpServer
 
         public void AddRoute(string method, string path, Func<Request, Task<Response>> handler)
         {
+            if (!path.StartsWith("/"))
+                path = "/" + path;
+
             method = method.ToUpper();
 
             var groups = Regex.Matches(path, "({.*?})");
@@ -27,7 +30,11 @@ namespace LittleHttpServer
             asyncHandlers[method][path] = handler;
         }
 
-        public async Task<Response> Invoke(string method, string path, Func<string> bodyFn, NameValueCollection queryStringValues)
+        public async Task<Response> Invoke(string method, 
+            string path, 
+            Func<string> bodyFn, 
+            NameValueCollection queryStringValues,
+            NameValueCollection headers)
         {
             method = method.ToUpper();
             Match match = null;
@@ -70,10 +77,17 @@ namespace LittleHttpServer
                         }
                     }
 
-                    var req = new Request(body, p, qs);
-                    var resp = await handler(req);
-
-                    return resp;
+                    var req = new Request(body, p, qs, headers);
+                    try
+                    {
+                        var resp = await handler(req);
+                        return resp;
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
+                        return new InternalServerErrorResponse();
+                    }
                 }
             }
 
